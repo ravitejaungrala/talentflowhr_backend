@@ -9,8 +9,8 @@ const app = express();
 // ✅ STEP 1: Allowed origins (update your real frontend URLs)
 const allowedOrigins = [
   'http://localhost:3001',                  // local React app
-  'https://talentflow-hr.vercel.app',       // your deployed frontend
-  'https://tubular-kulfi-296030.netlify.app/' // (optional, remove if unused)
+  'https://talentflowhr-frontend.netlify.app/',       // your deployed frontend
+  'https://talentflowhr-frontend.netlify.app' // (optional, remove if unused)
 ];
 
 // ✅ STEP 2: Configure CORS properly
