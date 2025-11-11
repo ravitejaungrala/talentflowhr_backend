@@ -1,0 +1,32 @@
+{
+  "name": "neuzen-backend",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed": "node utils/seedData.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.0",
+    "cookie-parser": "~1.4.4",
+    "cors": "^2.8.5",
+    "debug": "~2.6.9",
+    "dotenv": "^17.2.3",
+    "express": "~4.16.1",
+    "express-session": "^1.18.2",
+    "express-validator": "^7.3.0",
+    "helmet": "^7.0.0",
+    "http-errors": "~1.6.3",
+    "jade": "~1.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.0.0",
+    "mongoose": "^8.19.3",
+    "morgan": "~1.9.1",
+    "nodeman": "^1.1.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
