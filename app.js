@@ -9,7 +9,7 @@ const app = express();
 // Middleware - Updated CORS for production
 app.use(cors({
   origin: [
-    'http://localhost:3000',
+    'http://localhost:3001',
     'https://talentflow-hr.vercel.app',
     'https://your-frontend-domain.vercel.app' // Replace with your actual Vercel domain
   ],
