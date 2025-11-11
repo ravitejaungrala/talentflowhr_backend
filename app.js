@@ -50,6 +50,7 @@ const MONGODB_URI =
   process.env.MONGODB_URI ||
   'mongodb+srv://unvraviteja_db_user:7OvBWcpfd3Ch82xa@raviteja.qofofnp.mongodb.net/talentflow-hr?retryWrites=true&w=majority';
 
+
 mongoose
   .connect(MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB Atlas successfully'))
