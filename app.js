@@ -8,7 +8,7 @@ const app = express();
 
 // ✅ STEP 1: Allowed origins (update your real frontend URLs)
 const allowedOrigins = [
-  'http://localhost:3001',                  // local React app
+  'http://localhost:5173',                  // local React app
   'https://talentflowhr-frontend.netlify.app/',       // your deployed frontend
   'https://talentflowhr-frontend.netlify.app' // (optional, remove if unused)
 ];
