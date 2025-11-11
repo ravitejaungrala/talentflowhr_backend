@@ -6,55 +6,70 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware - Updated CORS for production
-app.use(cors({
-  origin: [
-    'http://localhost:3001',
-    'https://talentflow-hr.vercel.app',
-    'https://your-frontend-domain.vercel.app' // Replace with your actual Vercel domain
-  ],
-  credentials: true
-}));
+// ✅ STEP 1: Allowed origins (update your real frontend URLs)
+const allowedOrigins = [
+  'http://localhost:3001',                  // local React app
+  'https://talentflow-hr.vercel.app',       // your deployed frontend
+  'https://your-frontend-domain.vercel.app' // (optional, remove if unused)
+];
+
+// ✅ STEP 2: Configure CORS properly
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (e.g., Postman, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS not allowed for this origin: ' + origin));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // allow cookies and authorization headers
+  })
+);
+
+// ✅ STEP 3: Handle preflight (OPTIONS) requests globally
+app.options('*', cors());
+
+// ✅ STEP 4: Other middleware
 app.use(express.json());
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'talentflow-secret-key-prod',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'talentflow-secret-key-prod',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
 
-// MongoDB Atlas connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://unvraviteja_db_user:7OvBWcpfd3Ch82xa@raviteja.qofofnp.mongodb.net/talentflow-hr?retryWrites=true&w=majority';
+// ✅ STEP 5: MongoDB Atlas connection
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb+srv://unvraviteja_db_user:7OvBWcpfd3Ch82xa@raviteja.qofofnp.mongodb.net/talentflow-hr?retryWrites=true&w=majority';
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('Connected to MongoDB Atlas successfully');
-})
-.catch((error) => {
-  console.error('MongoDB Atlas connection error:', error);
-  process.exit(1);
-});
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB Atlas successfully'))
+  .catch((error) => {
+    console.error('❌ MongoDB Atlas connection error:', error);
+    process.exit(1);
+  });
 
-// MongoDB connection event handlers
+// MongoDB events (optional)
 mongoose.connection.on('connected', () => {
   console.log('Mongoose connected to MongoDB Atlas');
 });
-
 mongoose.connection.on('error', (err) => {
   console.error('Mongoose connection error:', err);
 });
-
 mongoose.connection.on('disconnected', () => {
   console.log('Mongoose disconnected from MongoDB Atlas');
 });
 
-// Routes
+// ✅ STEP 6: API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/feedback', require('./routes/feedback'));
@@ -67,25 +82,31 @@ app.use('/api/goals', require('./routes/goals'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/documents', require('./routes/documents'));
 
-// Basic health check route
+// ✅ Health check route
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    message: 'Server is running', 
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-    environment: process.env.NODE_ENV || 'development'
+  res.status(200).json({
+    message: 'Server is running',
+    database:
+      mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
-// Root route
+// ✅ Root route
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'TalentFlow HR API Server',
     version: '1.0.0',
-    status: 'Running'
+    status: 'Running',
   });
 });
 
+// ✅ STEP 7: Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+  console.log(
+    `🚀 Server running on port ${PORT} in ${
+      process.env.NODE_ENV || 'development'
+    } mode`
+  );
 });
