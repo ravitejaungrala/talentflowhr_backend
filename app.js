@@ -6,9 +6,8 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
-app.use(morgan('combined'));
-app.use(cors({
+// Enhanced CORS configuration
+const corsOptions = {
   origin: [
     'http://localhost:3000',
     'http://localhost:5173',
@@ -17,8 +16,18 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests globally
+app.options('*', cors(corsOptions));
+
+// Other middleware
+app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -49,6 +58,7 @@ const goalRoutes = require('./routes/goals');
 const recognitionRoutes = require('./routes/recognition');
 const surveyRoutes = require('./routes/surveys');
 const trainingRoutes = require('./routes/training');
+
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -61,6 +71,7 @@ app.use('/api/goals', goalRoutes);
 app.use('/api/recognition', recognitionRoutes);
 app.use('/api/surveys', surveyRoutes);
 app.use('/api/training', trainingRoutes);
+
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
