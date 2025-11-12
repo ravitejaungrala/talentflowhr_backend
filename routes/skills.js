@@ -2,10 +2,21 @@ const express = require('express');
 const Skill = require('../models/Skill');
 const router = express.Router();
 
+// Middleware to check if user is authenticated
+const isAuthenticated = (req, res, next) => {
+  if (req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ message: 'Authentication required' });
+  }
+};
+
 // Get all skills (with permissions)
-router.get('/', async (req, res) => {
+router.get('/', isAuthenticated, async (req, res) => {
   try {
     let skills;
+    console.log('Fetching skills for user:', req.session.userRole, req.session.userId);
+    
     if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
       skills = await Skill.find()
         .populate('employee', 'name email department position')
@@ -18,16 +29,20 @@ router.get('/', async (req, res) => {
         .sort({ createdAt: -1 });
     }
     
+    console.log('Found skills:', skills.length);
     res.json(skills);
   } catch (error) {
+    console.error('Error fetching skills:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 // Create skill
-router.post('/', async (req, res) => {
+router.post('/', isAuthenticated, async (req, res) => {
   try {
     const { name, category, proficiency, yearsOfExperience } = req.body;
+    
+    console.log('Creating skill for user:', req.session.userId);
     
     const skill = new Skill({
       employee: req.session.userId,
@@ -42,19 +57,25 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(skill);
   } catch (error) {
+    console.error('Error creating skill:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 // Update skill
-router.put('/:id', async (req, res) => {
+router.put('/:id', isAuthenticated, async (req, res) => {
   try {
     const { name, category, proficiency, yearsOfExperience } = req.body;
     
-    const skill = await Skill.findOne({
-      _id: req.params.id,
-      employee: req.session.userId
-    });
+    let skill;
+    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+      skill = await Skill.findById(req.params.id);
+    } else {
+      skill = await Skill.findOne({
+        _id: req.params.id,
+        employee: req.session.userId
+      });
+    }
 
     if (!skill) {
       return res.status(404).json({ message: 'Skill not found or access denied' });
@@ -70,12 +91,13 @@ router.put('/:id', async (req, res) => {
 
     res.json(skill);
   } catch (error) {
+    console.error('Error updating skill:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 // Verify skill (Admin/HR only)
-router.patch('/:id/verify', async (req, res) => {
+router.patch('/:id/verify', isAuthenticated, async (req, res) => {
   try {
     if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr') {
       return res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
@@ -97,33 +119,32 @@ router.patch('/:id/verify', async (req, res) => {
 
     res.json(skill);
   } catch (error) {
+    console.error('Error verifying skill:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 // Delete skill
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', isAuthenticated, async (req, res) => {
   try {
-    const skill = await Skill.findOne({
-      _id: req.params.id,
-      employee: req.session.userId
-    });
+    let skill;
+    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+      skill = await Skill.findById(req.params.id);
+    } else {
+      skill = await Skill.findOne({
+        _id: req.params.id,
+        employee: req.session.userId
+      });
+    }
 
     if (!skill) {
-      // Check if admin/HR trying to delete
-      if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
-        const adminSkill = await Skill.findByIdAndDelete(req.params.id);
-        if (!adminSkill) {
-          return res.status(404).json({ message: 'Skill not found' });
-        }
-        return res.json({ message: 'Skill deleted successfully' });
-      }
       return res.status(404).json({ message: 'Skill not found or access denied' });
     }
 
     await Skill.findByIdAndDelete(req.params.id);
     res.json({ message: 'Skill deleted successfully' });
   } catch (error) {
+    console.error('Error deleting skill:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
