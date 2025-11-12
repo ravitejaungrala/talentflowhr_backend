@@ -21,8 +21,17 @@ app.use(cors({
 // Handle preflight requests
 app.options('*', cors());
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`\n=== ${new Date().toISOString()} ===`);
+  console.log(`${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
+});
 
 // MongoDB Atlas connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://unvraviteja_db_user:7OvBWcpfd3Ch82xa@raviteja.qofofnp.mongodb.net/talentflow-hr?retryWrites=true&w=majority';
@@ -32,15 +41,12 @@ mongoose.connect(MONGODB_URI, {
   useUnifiedTopology: true,
 })
 .then(() => {
-  console.log('Connected to MongoDB Atlas successfully');
+  console.log('✅ Connected to MongoDB Atlas successfully');
 })
 .catch((error) => {
-  console.error('MongoDB Atlas connection error:', error);
+  console.error('❌ MongoDB Atlas connection error:', error);
   process.exit(1);
 });
-
-// Import middleware
-const { authenticateJWT } = require('./middleware/auth');
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -49,8 +55,6 @@ app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/skills', require('./routes/skills'));
 app.use('/api/announcements', require('./routes/announcements'));
-
-// Add other routes as needed...
 
 // Basic health check route
 app.get('/health', (req, res) => {
@@ -62,18 +66,55 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test route to verify JWT
+app.get('/api/test', require('./middleware/auth').authenticateJWT, (req, res) => {
+  res.json({ 
+    message: 'JWT is working!',
+    user: {
+      id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role
+    }
+  });
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
     message: 'TalentFlow HR API Server',
     version: '1.0.0',
     status: 'Running',
-    authentication: 'JWT Token Based',
-    cors: 'Enabled'
+    endpoints: [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/employees',
+      '/api/feedback',
+      '/api/leaves',
+      '/api/skills',
+      '/api/announcements',
+      '/health',
+      '/api/test'
+    ]
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('Global error handler:', error);
+  res.status(500).json({
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'production' ? {} : error.message
   });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+  console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+  console.log(`📊 Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
 });
