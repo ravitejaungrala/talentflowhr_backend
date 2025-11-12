@@ -3,7 +3,6 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'talentflow-jwt-secret-2024';
 
-// JWT Authentication Middleware
 const authenticateJWT = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
@@ -45,7 +44,6 @@ const authenticateJWT = async (req, res, next) => {
   }
 };
 
-// Admin/HR Check Middleware
 const requireAdminOrHR = (req, res, next) => {
   if (req.user.role === 'admin' || req.user.role === 'hr') {
     next();
