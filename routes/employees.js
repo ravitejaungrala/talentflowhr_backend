@@ -8,11 +8,16 @@ const router = express.Router();
 // Get all employees (accessible to all authenticated users for recognition purposes)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    const employees = await User.find({ isActive: true })
+    // Filter out the current user to prevent self-feedback/recognition
+    const employees = await User.find({ 
+      isActive: true,
+      _id: { $ne: req.user.id } // Exclude current user
+    })
       .select('-password')
       .sort({ name: 1 });
     res.json(employees);
   } catch (error) {
+    console.error('Error fetching employees:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
