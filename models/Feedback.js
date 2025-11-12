@@ -13,22 +13,16 @@ const feedbackSchema = new mongoose.Schema({
   },
   message: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   category: {
     type: String,
-    enum: ['positive', 'constructive', 'general'],
+    enum: ['general', 'positive', 'constructive'],
     default: 'general'
   },
   isAnonymous: {
     type: Boolean,
     default: false
-  },
-  status: {
-    type: String,
-    enum: ['active', 'archived'],
-    default: 'active'
   }
 }, {
   timestamps: true
