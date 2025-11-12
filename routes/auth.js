@@ -1,6 +1,14 @@
 const express = require('express');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'talentflow-jwt-secret-2024';
+
+// Generate JWT token
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+};
 
 // Register
 router.post('/register', async (req, res) => {
@@ -23,11 +31,11 @@ router.post('/register', async (req, res) => {
 
     await user.save();
     
-    req.session.userId = user._id;
-    req.session.userRole = user.role;
+    const token = generateToken(user._id);
     
     res.status(201).json({
       message: 'User created successfully',
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -52,11 +60,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    req.session.userId = user._id;
-    req.session.userRole = user.role;
+    const token = generateToken(user._id);
 
     res.json({
       message: 'Login successful',
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -71,25 +79,27 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Logout
-router.post('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ message: 'Logout failed' });
-    }
-    res.clearCookie('connect.sid');
-    res.json({ message: 'Logout successful' });
-  });
-});
-
-// Check auth status
-router.get('/me', async (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: 'Not authenticated' });
+// Verify token middleware
+const verifyToken = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Access denied. No token provided.' });
   }
 
   try {
-    const user = await User.findById(req.session.userId).select('-password');
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
+// Get current user
+router.get('/me', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
