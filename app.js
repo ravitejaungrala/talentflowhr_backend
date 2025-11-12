@@ -1,8 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const session = require('express-session');
-const MongoStore = require('connect-mongo');
 require('dotenv').config();
 
 const app = express();
@@ -41,35 +39,6 @@ mongoose.connect(MONGODB_URI, {
   process.exit(1);
 });
 
-// Enhanced session configuration with MongoDB store
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'talentflow-secret-key-production-2024',
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: MONGODB_URI,
-    collectionName: 'sessions',
-    ttl: 24 * 60 * 60 // 1 day
-  }),
-  cookie: { 
-    secure: false, // Set to true in production with HTTPS
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
-  }
-}));
-
-// Add session debugging middleware
-app.use((req, res, next) => {
-  console.log('Session Info:', {
-    sessionId: req.sessionID,
-    userId: req.session.userId,
-    userRole: req.session.userRole,
-    path: req.path
-  });
-  next();
-});
-
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
@@ -93,23 +62,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Session test route
-app.get('/api/session-test', (req, res) => {
-  res.json({
-    sessionId: req.sessionID,
-    userId: req.session.userId,
-    userRole: req.session.userRole,
-    session: req.session
-  });
-});
-
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
     message: 'TalentFlow HR API Server',
     version: '1.0.0',
     status: 'Running',
-    frontend_url: 'https://talentflowhr-frontend.netlify.app',
+    authentication: 'JWT Token Based',
     cors: 'Enabled'
   });
 });
