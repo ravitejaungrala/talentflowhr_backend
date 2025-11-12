@@ -1,12 +1,12 @@
 const express = require('express');
 const Survey = require('../models/Survey');
+const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all surveys
-router.get('/', async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     const surveys = await Survey.find()
-      .populate('author', 'name email')
       .populate('responses.employee', 'name email department');
     res.json(surveys);
   } catch (error) {
@@ -15,12 +15,13 @@ router.get('/', async (req, res) => {
 });
 
 // Create survey
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
-    const survey = new Survey({
-      ...req.body,
-      author: req.session.userId
-    });
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const survey = new Survey(req.body);
     await survey.save();
     res.status(201).json(survey);
   } catch (error) {
@@ -29,7 +30,7 @@ router.post('/', async (req, res) => {
 });
 
 // Submit survey response
-router.post('/:id/respond', async (req, res) => {
+router.post('/:id/respond', authenticateJWT, async (req, res) => {
   try {
     const { answers } = req.body;
     const survey = await Survey.findById(req.params.id);
@@ -39,7 +40,7 @@ router.post('/:id/respond', async (req, res) => {
     }
 
     const existingResponse = survey.responses.find(
-      response => response.employee.toString() === req.session.userId
+      response => response.employee && response.employee.toString() === req.user.id
     );
 
     if (existingResponse) {
@@ -47,11 +48,12 @@ router.post('/:id/respond', async (req, res) => {
     }
 
     survey.responses.push({
-      employee: req.session.userId,
+      employee: req.user.id,
       answers
     });
 
     await survey.save();
+    await survey.populate('responses.employee', 'name email department');
     res.json(survey);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
