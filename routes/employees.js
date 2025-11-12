@@ -1,29 +1,60 @@
 const express = require('express');
 const User = require('../models/User');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 
-// Middleware to check if user is authenticated
-const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
+const JWT_SECRET = process.env.JWT_SECRET || 'talentflow-jwt-secret-2024';
+
+// Verify token middleware
+const verifyToken = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Access denied. No token provided.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.userId;
     next();
-  } else {
-    res.status(401).json({ message: 'Authentication required' });
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
+// Get user from token
+const getUserFromToken = async (req) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return null;
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    return user;
+  } catch (error) {
+    return null;
   }
 };
 
 // Middleware to check if user is admin or HR
-const isAdminOrHR = (req, res, next) => {
-  if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
+const isAdminOrHR = async (req, res, next) => {
+  try {
+    const user = await getUserFromToken(req);
+    if (user && (user.role === 'admin' || user.role === 'hr')) {
+      req.user = user;
+      next();
+    } else {
+      res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
 // Get all employees (Admin/HR only)
-router.get('/', isAuthenticated, isAdminOrHR, async (req, res) => {
+router.get('/', verifyToken, isAdminOrHR, async (req, res) => {
   try {
-    console.log('Fetching employees for user:', req.session.userRole, req.session.userId);
+    console.log('Fetching employees for user:', req.user.role, req.user.id);
     const employees = await User.find({ 
       $or: [
         { role: 'employee' },
@@ -39,41 +70,25 @@ router.get('/', isAuthenticated, isAdminOrHR, async (req, res) => {
   }
 });
 
-// Get employee by ID
-router.get('/:id', isAuthenticated, async (req, res) => {
-  try {
-    const employee = await User.findById(req.params.id).select('-password');
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    
-    // Employees can only view their own profile, unless admin/HR
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr' && 
-        req.session.userId !== req.params.id) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-    
-    res.json(employee);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
 // Update employee
-router.put('/:id', isAuthenticated, async (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   try {
+    const user = await getUserFromToken(req);
+    if (!user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const { name, email, role, isActive } = req.body;
     
     // Check permissions
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr' && 
-        req.session.userId !== req.params.id) {
+    if (user.role !== 'admin' && user.role !== 'hr' && user._id.toString() !== req.params.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
     const updateData = { name, email, role, isActive };
     
     // Only admin can change role to admin
-    if (req.session.userRole !== 'admin' && role === 'admin') {
+    if (user.role !== 'admin' && role === 'admin') {
       return res.status(403).json({ message: 'Only admin can assign admin role' });
     }
 
@@ -94,14 +109,15 @@ router.put('/:id', isAuthenticated, async (req, res) => {
 });
 
 // Delete employee (Admin only)
-router.delete('/:id', isAuthenticated, async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
-    if (req.session.userRole !== 'admin') {
+    const user = await getUserFromToken(req);
+    if (!user || user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin role required.' });
     }
 
     // Prevent self-deletion
-    if (req.session.userId === req.params.id) {
+    if (user._id.toString() === req.params.id) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
