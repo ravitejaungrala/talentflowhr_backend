@@ -1,35 +1,28 @@
 {
-  "name": "neuzen-backend",
-  "version": "0.0.0",
-  "private": true,
+  "name": "talentflowhr-backend",
+  "version": "1.0.0",
+  "description": "TalentFlow HR Management System Backend",
+  "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
     "seed": "node utils/seedData.js"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "body-parser": "^2.2.0",
-    "cookie-parser": "~1.4.4",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "debug": "~2.6.9",
-    "dotenv": "^17.2.3",
-    "express": "~4.16.1",
-    "express-session": "^1.18.2",
-    "express-validator": "^7.3.0",
-    "helmet": "^7.0.0",
-    "http-errors": "~1.6.3",
-    "jade": "~1.11.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^7.0.0",
-    "mongoose": "^8.19.3",
-    "morgan": "~1.9.1",
-    "nodeman": "^1.1.2"
+    "mongoose": "^7.5.0",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-   "engines": {
+  "engines": {
     "node": ">=16.0.0"
   }
 }
