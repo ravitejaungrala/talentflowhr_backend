@@ -134,7 +134,19 @@ MongoDB Collections:
    git clone https://github.com/yourusername/talentflow-hr.git
    cd talentflow-hr/backend
 
-🤝 Contributing
+2. ***Install dependencies**
+npm install
+3. ***Start development server**
+npm run dev
+
+4. ***Build Configuration**
+Build Command: npm install
+
+Start Command: node server.js
+
+Health Check Path: /health
+
+5. ***🤝 Contributing**
 Fork the repository
 
 Create feature branch (git checkout -b feature/AmazingFeature)
