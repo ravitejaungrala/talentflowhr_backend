@@ -6,9 +6,9 @@ const router = express.Router();
 // Get all skills (with permissions)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    let skills;
     console.log('Fetching skills for user:', req.user.role, req.user.id);
     
+    let skills;
     if (req.user.role === 'admin' || req.user.role === 'hr') {
       skills = await Skill.find()
         .populate('employee', 'name email department position')
@@ -25,7 +25,10 @@ router.get('/', authenticateJWT, async (req, res) => {
     res.json(skills);
   } catch (error) {
     console.error('Error fetching skills:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error fetching skills', 
+      error: error.message 
+    });
   }
 });
 
@@ -36,12 +39,18 @@ router.post('/', authenticateJWT, async (req, res) => {
     
     console.log('Creating skill for user:', req.user.id);
     
+    if (!name || !category || !proficiency) {
+      return res.status(400).json({ 
+        message: 'Name, category, and proficiency are required' 
+      });
+    }
+
     const skill = new Skill({
       employee: req.user.id,
       name,
       category,
       proficiency,
-      yearsOfExperience
+      yearsOfExperience: yearsOfExperience || 0
     });
 
     await skill.save();
@@ -50,7 +59,10 @@ router.post('/', authenticateJWT, async (req, res) => {
     res.status(201).json(skill);
   } catch (error) {
     console.error('Error creating skill:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error creating skill', 
+      error: error.message 
+    });
   }
 });
 
@@ -73,18 +85,21 @@ router.put('/:id', authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: 'Skill not found or access denied' });
     }
 
-    skill.name = name;
-    skill.category = category;
-    skill.proficiency = proficiency;
-    skill.yearsOfExperience = yearsOfExperience;
+    skill.name = name || skill.name;
+    skill.category = category || skill.category;
+    skill.proficiency = proficiency || skill.proficiency;
+    skill.yearsOfExperience = yearsOfExperience !== undefined ? yearsOfExperience : skill.yearsOfExperience;
+    
     await skill.save();
-
     await skill.populate('employee', 'name email department position');
 
     res.json(skill);
   } catch (error) {
     console.error('Error updating skill:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error updating skill', 
+      error: error.message 
+    });
   }
 });
 
@@ -108,7 +123,10 @@ router.patch('/:id/verify', authenticateJWT, requireAdminOrHR, async (req, res) 
     res.json(skill);
   } catch (error) {
     console.error('Error verifying skill:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error verifying skill', 
+      error: error.message 
+    });
   }
 });
 
@@ -133,7 +151,10 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     res.json({ message: 'Skill deleted successfully' });
   } catch (error) {
     console.error('Error deleting skill:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error deleting skill', 
+      error: error.message 
+    });
   }
 });
 
