@@ -39,18 +39,18 @@ mongoose.connect(MONGODB_URI, {
   process.exit(1);
 });
 
+// Import middleware
+const { authenticateJWT } = require('./middleware/auth');
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/skills', require('./routes/skills'));
-app.use('/api/recognition', require('./routes/recognition'));
-app.use('/api/training', require('./routes/training'));
-app.use('/api/surveys', require('./routes/surveys'));
-app.use('/api/goals', require('./routes/goals'));
 app.use('/api/announcements', require('./routes/announcements'));
-app.use('/api/documents', require('./routes/documents'));
+
+// Add other routes as needed...
 
 // Basic health check route
 app.get('/health', (req, res) => {
