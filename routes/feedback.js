@@ -1,15 +1,23 @@
 const express = require('express');
 const Feedback = require('../models/Feedback');
-const User = require('../models/User');
 const router = express.Router();
 
+// Middleware to check if user is authenticated
+const isAuthenticated = (req, res, next) => {
+  if (req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ message: 'Authentication required' });
+  }
+};
+
 // Get all feedback (with permissions)
-router.get('/', async (req, res) => {
+router.get('/', isAuthenticated, async (req, res) => {
   try {
     let feedback;
-    console.log('Fetching feedback for user:', req.user?.role, req.user?.id);
+    console.log('Fetching feedback for user:', req.session.userRole, req.session.userId);
     
-    if (req.user?.role === 'admin' || req.user?.role === 'hr') {
+    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
       feedback = await Feedback.find()
         .populate('fromEmployee', 'name email department')
         .populate('toEmployee', 'name email department')
@@ -17,8 +25,8 @@ router.get('/', async (req, res) => {
     } else {
       feedback = await Feedback.find({
         $or: [
-          { fromEmployee: req.user?.id },
-          { toEmployee: req.user?.id }
+          { fromEmployee: req.session.userId },
+          { toEmployee: req.session.userId }
         ]
       })
       .populate('fromEmployee', 'name email department')
@@ -35,14 +43,14 @@ router.get('/', async (req, res) => {
 });
 
 // Create feedback
-router.post('/', async (req, res) => {
+router.post('/', isAuthenticated, async (req, res) => {
   try {
     const { toEmployee, message, category, isAnonymous } = req.body;
     
-    console.log('Creating feedback from:', req.user?.id, 'to:', toEmployee);
+    console.log('Creating feedback from:', req.session.userId, 'to:', toEmployee);
     
     const feedback = new Feedback({
-      fromEmployee: req.user?.id,
+      fromEmployee: req.session.userId,
       toEmployee,
       message,
       category,
@@ -61,17 +69,17 @@ router.post('/', async (req, res) => {
 });
 
 // Update feedback
-router.put('/:id', async (req, res) => {
+router.put('/:id', isAuthenticated, async (req, res) => {
   try {
     const { message, category, isAnonymous } = req.body;
     
     let feedback;
-    if (req.user?.role === 'admin' || req.user?.role === 'hr') {
+    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
       feedback = await Feedback.findById(req.params.id);
     } else {
       feedback = await Feedback.findOne({
         _id: req.params.id,
-        fromEmployee: req.user?.id
+        fromEmployee: req.session.userId
       });
     }
 
@@ -95,15 +103,15 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete feedback
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', isAuthenticated, async (req, res) => {
   try {
     let feedback;
-    if (req.user?.role === 'admin' || req.user?.role === 'hr') {
+    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
       feedback = await Feedback.findById(req.params.id);
     } else {
       feedback = await Feedback.findOne({
         _id: req.params.id,
-        fromEmployee: req.user?.id
+        fromEmployee: req.session.userId
       });
     }
 
