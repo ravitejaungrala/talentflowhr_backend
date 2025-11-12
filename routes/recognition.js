@@ -1,9 +1,10 @@
 const express = require('express');
 const Recognition = require('../models/Recognition');
+const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all recognition
-router.get('/', async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     const recognition = await Recognition.find()
       .populate('fromEmployee', 'name email department position')
@@ -16,12 +17,12 @@ router.get('/', async (req, res) => {
 });
 
 // Create recognition
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { toEmployee, category, message, points, isPublic, tags } = req.body;
     
     const recognition = new Recognition({
-      fromEmployee: req.session.userId,
+      fromEmployee: req.user.id,
       toEmployee,
       category,
       message,
@@ -41,7 +42,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get recognition leaderboard
-router.get('/leaderboard', async (req, res) => {
+router.get('/leaderboard', authenticateJWT, async (req, res) => {
   try {
     const leaderboard = await Recognition.aggregate([
       {
