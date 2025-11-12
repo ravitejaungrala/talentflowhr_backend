@@ -1,23 +1,15 @@
 const express = require('express');
 const Feedback = require('../models/Feedback');
+const { authenticateJWT, requireAdminOrHR } = require('../middleware/auth');
 const router = express.Router();
 
-// Middleware to check if user is authenticated
-const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
-    next();
-  } else {
-    res.status(401).json({ message: 'Authentication required' });
-  }
-};
-
 // Get all feedback (with permissions)
-router.get('/', isAuthenticated, async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     let feedback;
-    console.log('Fetching feedback for user:', req.session.userRole, req.session.userId);
+    console.log('Fetching feedback for user:', req.user.role, req.user.id);
     
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       feedback = await Feedback.find()
         .populate('fromEmployee', 'name email department')
         .populate('toEmployee', 'name email department')
@@ -25,8 +17,8 @@ router.get('/', isAuthenticated, async (req, res) => {
     } else {
       feedback = await Feedback.find({
         $or: [
-          { fromEmployee: req.session.userId },
-          { toEmployee: req.session.userId }
+          { fromEmployee: req.user.id },
+          { toEmployee: req.user.id }
         ]
       })
       .populate('fromEmployee', 'name email department')
@@ -43,14 +35,14 @@ router.get('/', isAuthenticated, async (req, res) => {
 });
 
 // Create feedback
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { toEmployee, message, category, isAnonymous } = req.body;
     
-    console.log('Creating feedback from:', req.session.userId, 'to:', toEmployee);
+    console.log('Creating feedback from:', req.user.id, 'to:', toEmployee);
     
     const feedback = new Feedback({
-      fromEmployee: req.session.userId,
+      fromEmployee: req.user.id,
       toEmployee,
       message,
       category,
@@ -69,17 +61,17 @@ router.post('/', isAuthenticated, async (req, res) => {
 });
 
 // Update feedback
-router.put('/:id', isAuthenticated, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
   try {
     const { message, category, isAnonymous } = req.body;
     
     let feedback;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       feedback = await Feedback.findById(req.params.id);
     } else {
       feedback = await Feedback.findOne({
         _id: req.params.id,
-        fromEmployee: req.session.userId
+        fromEmployee: req.user.id
       });
     }
 
@@ -103,15 +95,15 @@ router.put('/:id', isAuthenticated, async (req, res) => {
 });
 
 // Delete feedback
-router.delete('/:id', isAuthenticated, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
     let feedback;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       feedback = await Feedback.findById(req.params.id);
     } else {
       feedback = await Feedback.findOne({
         _id: req.params.id,
-        fromEmployee: req.session.userId
+        fromEmployee: req.user.id
       });
     }
 
