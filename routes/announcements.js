@@ -6,20 +6,13 @@ const router = express.Router();
 // Get all announcements
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    console.log('Fetching announcements for user:', req.user.role, req.user.id);
-    
     const announcements = await Announcement.find({ isActive: true })
       .populate('author', 'name email')
       .sort({ createdAt: -1 });
     
-    console.log('Found announcements:', announcements.length);
     res.json(announcements);
   } catch (error) {
-    console.error('Error fetching announcements:', error);
-    res.status(500).json({ 
-      message: 'Server error fetching announcements', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -27,8 +20,6 @@ router.get('/', authenticateJWT, async (req, res) => {
 router.post('/', authenticateJWT, requireAdminOrHR, async (req, res) => {
   try {
     const { title, content, priority, targetAudience, department, role } = req.body;
-    
-    console.log('Creating announcement by user:', req.user.id);
     
     if (!title || !content) {
       return res.status(400).json({ message: 'Title and content are required' });
@@ -49,11 +40,7 @@ router.post('/', authenticateJWT, requireAdminOrHR, async (req, res) => {
 
     res.status(201).json(announcement);
   } catch (error) {
-    console.error('Error creating announcement:', error);
-    res.status(500).json({ 
-      message: 'Server error creating announcement', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
