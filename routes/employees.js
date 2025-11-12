@@ -5,7 +5,7 @@ const router = express.Router();
 
 // Get all employees (Admin/HR only)
 
-// Get all employees (accessible to all authenticated users for recognition purposes)
+// Get all employees (accessible to all authenticated users for feedback/recognition)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
     // Filter out the current user to prevent self-feedback/recognition
@@ -13,8 +13,10 @@ router.get('/', authenticateJWT, async (req, res) => {
       isActive: true,
       _id: { $ne: req.user.id } // Exclude current user
     })
-      .select('-password')
+      .select('name email department position role')
       .sort({ name: 1 });
+    
+    console.log(`Fetched ${employees.length} employees for user ${req.user.id}`);
     res.json(employees);
   } catch (error) {
     console.error('Error fetching employees:', error);
@@ -22,7 +24,7 @@ router.get('/', authenticateJWT, async (req, res) => {
   }
 });
 
-// Other employee management routes (create, update, delete) can remain restricted to admin/HR
+// Create employee (admin/HR only)
 router.post('/', authenticateJWT, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'hr') {
@@ -31,8 +33,12 @@ router.post('/', authenticateJWT, async (req, res) => {
 
     const employee = new User(req.body);
     await employee.save();
-    res.status(201).json(employee);
+    
+    // Return without password
+    const employeeWithoutPassword = await User.findById(employee._id).select('-password');
+    res.status(201).json(employeeWithoutPassword);
   } catch (error) {
+    console.error('Error creating employee:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
