@@ -12,6 +12,7 @@ router.get('/', authenticateJWT, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(recognition);
   } catch (error) {
+    console.error('Error fetching recognition:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -20,23 +21,37 @@ router.get('/', authenticateJWT, async (req, res) => {
 router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { toEmployee, category, message, points, isPublic, tags } = req.body;
-    
+
+    // Validate required fields
+    if (!toEmployee || !message) {
+      return res.status(400).json({ message: 'Recipient and message are required' });
+    }
+
+    // Users cannot recognize themselves
+    if (toEmployee === req.user.id) {
+      return res.status(400).json({ message: 'Cannot recognize yourself' });
+    }
+
     const recognition = new Recognition({
       fromEmployee: req.user.id,
       toEmployee,
-      category,
+      category: category || 'excellence',
       message,
-      points,
-      isPublic,
-      tags
+      points: points || 10,
+      isPublic: isPublic !== undefined ? isPublic : true,
+      tags: tags || []
     });
 
     await recognition.save();
-    await recognition.populate('fromEmployee', 'name email department position');
-    await recognition.populate('toEmployee', 'name email department position');
+    
+    // Populate the saved recognition with full employee details
+    const populatedRecognition = await Recognition.findById(recognition._id)
+      .populate('fromEmployee', 'name email department position')
+      .populate('toEmployee', 'name email department position');
 
-    res.status(201).json(recognition);
+    res.status(201).json(populatedRecognition);
   } catch (error) {
+    console.error('Error saving recognition:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -79,6 +94,7 @@ router.get('/leaderboard', authenticateJWT, async (req, res) => {
 
     res.json(leaderboard);
   } catch (error) {
+    console.error('Error fetching leaderboard:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
