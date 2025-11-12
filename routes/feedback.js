@@ -39,6 +39,11 @@ router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { toEmployee, message, category, isAnonymous } = req.body;
 
+    // Validate required fields
+    if (!toEmployee || !message) {
+      return res.status(400).json({ message: 'Recipient and message are required' });
+    }
+
     // Employees cannot send feedback to themselves
     if (toEmployee === req.user.id) {
       return res.status(400).json({ message: 'Cannot send feedback to yourself' });
@@ -54,11 +59,12 @@ router.post('/', authenticateJWT, async (req, res) => {
 
     await feedback.save();
     
-    // Populate the saved feedback
-    await feedback.populate('fromEmployee', 'name email department position');
-    await feedback.populate('toEmployee', 'name email department position');
+    // Populate the saved feedback with full employee details
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('fromEmployee', 'name email department position')
+      .populate('toEmployee', 'name email department position');
     
-    res.status(201).json(feedback);
+    res.status(201).json(populatedFeedback);
   } catch (error) {
     console.error('Error creating feedback:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -88,10 +94,13 @@ router.put('/:id', authenticateJWT, async (req, res) => {
     feedback.isAnonymous = isAnonymous !== undefined ? isAnonymous : feedback.isAnonymous;
 
     await feedback.save();
-    await feedback.populate('fromEmployee', 'name email department position');
-    await feedback.populate('toEmployee', 'name email department position');
     
-    res.json(feedback);
+    // Populate the updated feedback
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('fromEmployee', 'name email department position')
+      .populate('toEmployee', 'name email department position');
+    
+    res.json(populatedFeedback);
   } catch (error) {
     console.error('Error updating feedback:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
