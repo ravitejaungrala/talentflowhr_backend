@@ -6,9 +6,9 @@ const router = express.Router();
 // Get all leaves (with permissions)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    let leaves;
     console.log('Fetching leaves for user:', req.user.role, req.user.id);
     
+    let leaves;
     if (req.user.role === 'admin' || req.user.role === 'hr') {
       leaves = await Leave.find()
         .populate('employee', 'name email department position')
@@ -25,7 +25,10 @@ router.get('/', authenticateJWT, async (req, res) => {
     res.json(leaves);
   } catch (error) {
     console.error('Error fetching leaves:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error fetching leaves', 
+      error: error.message 
+    });
   }
 });
 
@@ -36,11 +39,25 @@ router.post('/', authenticateJWT, async (req, res) => {
     
     console.log('Creating leave for user:', req.user.id);
     
+    if (!leaveType || !startDate || !endDate || !reason) {
+      return res.status(400).json({ 
+        message: 'Leave type, start date, end date, and reason are required' 
+      });
+    }
+
+    // Validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (start >= end) {
+      return res.status(400).json({ message: 'End date must be after start date' });
+    }
+
     const leave = new Leave({
       employee: req.user.id,
       leaveType,
-      startDate,
-      endDate,
+      startDate: start,
+      endDate: end,
       reason
     });
 
@@ -50,7 +67,10 @@ router.post('/', authenticateJWT, async (req, res) => {
     res.status(201).json(leave);
   } catch (error) {
     console.error('Error creating leave:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error creating leave', 
+      error: error.message 
+    });
   }
 });
 
@@ -65,7 +85,8 @@ router.put('/:id', authenticateJWT, async (req, res) => {
     } else {
       leave = await Leave.findOne({
         _id: req.params.id,
-        employee: req.user.id
+        employee: req.user.id,
+        status: 'pending' // Only allow editing pending leaves
       });
     }
 
@@ -73,18 +94,26 @@ router.put('/:id', authenticateJWT, async (req, res) => {
       return res.status(404).json({ message: 'Leave request not found or access denied' });
     }
 
-    leave.leaveType = leaveType;
-    leave.startDate = startDate;
-    leave.endDate = endDate;
-    leave.reason = reason;
-    await leave.save();
+    // Only allow editing pending leaves
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ message: 'Only pending leaves can be edited' });
+    }
 
+    leave.leaveType = leaveType || leave.leaveType;
+    leave.startDate = startDate ? new Date(startDate) : leave.startDate;
+    leave.endDate = endDate ? new Date(endDate) : leave.endDate;
+    leave.reason = reason || leave.reason;
+    
+    await leave.save();
     await leave.populate('employee', 'name email department position');
 
     res.json(leave);
   } catch (error) {
     console.error('Error updating leave:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error updating leave', 
+      error: error.message 
+    });
   }
 });
 
@@ -93,12 +122,16 @@ router.patch('/:id/status', authenticateJWT, requireAdminOrHR, async (req, res) 
   try {
     const { status, notes } = req.body;
     
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Valid status (approved/rejected) is required' });
+    }
+
     const leave = await Leave.findByIdAndUpdate(
       req.params.id,
       { 
         status,
         approvedBy: req.user.id,
-        notes
+        notes: notes || ''
       },
       { new: true, runValidators: true }
     ).populate('employee', 'name email department position')
@@ -111,7 +144,10 @@ router.patch('/:id/status', authenticateJWT, requireAdminOrHR, async (req, res) 
     res.json(leave);
   } catch (error) {
     console.error('Error updating leave status:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error updating leave status', 
+      error: error.message 
+    });
   }
 });
 
@@ -124,7 +160,8 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     } else {
       leave = await Leave.findOne({
         _id: req.params.id,
-        employee: req.user.id
+        employee: req.user.id,
+        status: 'pending' // Only allow deleting pending leaves
       });
     }
 
@@ -136,7 +173,10 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     res.json({ message: 'Leave request deleted successfully' });
   } catch (error) {
     console.error('Error deleting leave:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Server error deleting leave', 
+      error: error.message 
+    });
   }
 });
 
