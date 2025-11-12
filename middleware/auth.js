@@ -6,7 +6,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'talentflow-jwt-secret-2024';
 // JWT Authentication Middleware
 const authenticateJWT = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const authHeader = req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
@@ -22,6 +27,7 @@ const authenticateJWT = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('JWT Authentication error:', error);
     res.status(401).json({ message: 'Invalid token.' });
   }
 };
