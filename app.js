@@ -28,8 +28,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, res, next) => {
   console.log(`\n=== ${new Date().toISOString()} ===`);
   console.log(`${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
   next();
 });
 
@@ -48,13 +46,21 @@ mongoose.connect(MONGODB_URI, {
   process.exit(1);
 });
 
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/employees', require('./routes/employees'));
-app.use('/api/feedback', require('./routes/feedback'));
-app.use('/api/leaves', require('./routes/leaves'));
-app.use('/api/skills', require('./routes/skills'));
-app.use('/api/announcements', require('./routes/announcements'));
+// Import routes - make sure these files exist and export router correctly
+const authRoutes = require('./routes/auth');
+const employeeRoutes = require('./routes/employees');
+const feedbackRoutes = require('./routes/feedback');
+const leaveRoutes = require('./routes/leaves');
+const skillRoutes = require('./routes/skills');
+const announcementRoutes = require('./routes/announcements');
+
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/leaves', leaveRoutes);
+app.use('/api/skills', skillRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Basic health check route
 app.get('/health', (req, res) => {
@@ -67,7 +73,8 @@ app.get('/health', (req, res) => {
 });
 
 // Test route to verify JWT
-app.get('/api/test', require('./middleware/auth').authenticateJWT, (req, res) => {
+const { authenticateJWT } = require('./middleware/auth');
+app.get('/api/test', authenticateJWT, (req, res) => {
   res.json({ 
     message: 'JWT is working!',
     user: {
