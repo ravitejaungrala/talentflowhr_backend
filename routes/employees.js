@@ -4,20 +4,30 @@ const { authenticateJWT, requireAdminOrHR } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all employees (Admin/HR only)
-router.get('/', authenticateJWT, requireAdminOrHR, async (req, res) => {
+
+// Get all employees (accessible to all authenticated users for recognition purposes)
+router.get('/', authenticateJWT, async (req, res) => {
   try {
-    console.log('Fetching employees for user:', req.user.role, req.user.id);
-    const employees = await User.find({ 
-      $or: [
-        { role: 'employee' },
-        { role: 'hr' },
-        { role: 'admin' }
-      ]
-    }).select('-password').sort({ createdAt: -1 });
-    console.log('Found employees:', employees.length);
+    const employees = await User.find({ isActive: true })
+      .select('-password')
+      .sort({ name: 1 });
     res.json(employees);
   } catch (error) {
-    console.error('Error fetching employees:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Other employee management routes (create, update, delete) can remain restricted to admin/HR
+router.post('/', authenticateJWT, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const employee = new User(req.body);
+    await employee.save();
+    res.status(201).json(employee);
+  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
