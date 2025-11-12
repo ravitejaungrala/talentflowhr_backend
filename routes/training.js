@@ -1,9 +1,10 @@
 const express = require('express');
 const Training = require('../models/Training');
+const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all training
-router.get('/', async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     const training = await Training.find()
       .populate('enrolledEmployees.employee', 'name email department position');
@@ -14,8 +15,12 @@ router.get('/', async (req, res) => {
 });
 
 // Create training
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     const training = new Training(req.body);
     await training.save();
     res.status(201).json(training);
@@ -25,7 +30,7 @@ router.post('/', async (req, res) => {
 });
 
 // Enroll in training
-router.post('/:id/enroll', async (req, res) => {
+router.post('/:id/enroll', authenticateJWT, async (req, res) => {
   try {
     const training = await Training.findById(req.params.id);
     if (!training) {
@@ -33,7 +38,7 @@ router.post('/:id/enroll', async (req, res) => {
     }
 
     const existingEnrollment = training.enrolledEmployees.find(
-      enrollment => enrollment.employee.toString() === req.session.userId
+      enrollment => enrollment.employee && enrollment.employee.toString() === req.user.id
     );
 
     if (existingEnrollment) {
@@ -41,11 +46,12 @@ router.post('/:id/enroll', async (req, res) => {
     }
 
     training.enrolledEmployees.push({
-      employee: req.session.userId,
+      employee: req.user.id,
       progress: 0
     });
 
     await training.save();
+    await training.populate('enrolledEmployees.employee', 'name email department position');
     res.json(training);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -53,7 +59,7 @@ router.post('/:id/enroll', async (req, res) => {
 });
 
 // Update training progress
-router.patch('/:id/progress', async (req, res) => {
+router.patch('/:id/progress', authenticateJWT, async (req, res) => {
   try {
     const { progress } = req.body;
     const training = await Training.findById(req.params.id);
@@ -63,7 +69,7 @@ router.patch('/:id/progress', async (req, res) => {
     }
 
     const enrollment = training.enrolledEmployees.find(
-      e => e.employee.toString() === req.session.userId
+      e => e.employee && e.employee.toString() === req.user.id
     );
 
     if (!enrollment) {
@@ -77,6 +83,7 @@ router.patch('/:id/progress', async (req, res) => {
     }
 
     await training.save();
+    await training.populate('enrolledEmployees.employee', 'name email department position');
     res.json(training);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
