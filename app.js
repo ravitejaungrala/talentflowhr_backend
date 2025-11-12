@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 require('dotenv').config();
 
 const app = express();
@@ -11,8 +12,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:5173',
-    'https://talenthr-front.onrender.com/',
-    'https://talenthr-front.onrender.com'
+    'https://talenthr-front.onrender.com',
+    'https://talentflowhr-frontend.netlify.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -24,20 +25,6 @@ app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Enhanced session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'talentflow-secret-key-production-2024',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: false, // Set to true if using HTTPS
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
-  },
-  proxy: true // Trust the reverse proxy
-}));
 
 // MongoDB Atlas connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://unvraviteja_db_user:7OvBWcpfd3Ch82xa@raviteja.qofofnp.mongodb.net/talentflow-hr?retryWrites=true&w=majority';
@@ -54,17 +41,33 @@ mongoose.connect(MONGODB_URI, {
   process.exit(1);
 });
 
-// MongoDB connection event handlers
-mongoose.connection.on('connected', () => {
-  console.log('Mongoose connected to MongoDB Atlas');
-});
+// Enhanced session configuration with MongoDB store
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'talentflow-secret-key-production-2024',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: MONGODB_URI,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60 // 1 day
+  }),
+  cookie: { 
+    secure: false, // Set to true in production with HTTPS
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax'
+  }
+}));
 
-mongoose.connection.on('error', (err) => {
-  console.error('Mongoose connection error:', err);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('Mongoose disconnected from MongoDB Atlas');
+// Add session debugging middleware
+app.use((req, res, next) => {
+  console.log('Session Info:', {
+    sessionId: req.sessionID,
+    userId: req.session.userId,
+    userRole: req.session.userRole,
+    path: req.path
+  });
+  next();
 });
 
 // Routes
@@ -90,6 +93,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Session test route
+app.get('/api/session-test', (req, res) => {
+  res.json({
+    sessionId: req.sessionID,
+    userId: req.session.userId,
+    userRole: req.session.userRole,
+    session: req.session
+  });
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
@@ -101,21 +114,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Test route for CORS
-app.get('/api/test-cors', (req, res) => {
-  res.json({ 
-    message: 'CORS is working!',
-    origin: req.headers.origin,
-    timestamp: new Date().toISOString()
-  });
-});
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-  console.log(`CORS enabled for: ${[
-    'http://localhost:3000',
-    'http://localhost:5173', 
-    'https://talentflowhr-frontend.netlify.app'
-  ].join(', ')}`);
 });
