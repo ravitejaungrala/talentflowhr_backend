@@ -4,7 +4,7 @@ const router = express.Router();
 
 // Middleware to check if user is admin or HR
 const isAdminOrHR = (req, res, next) => {
-  if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+  if (req.user?.role === 'admin' || req.user?.role === 'hr') {
     next();
   } else {
     res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
@@ -14,9 +14,17 @@ const isAdminOrHR = (req, res, next) => {
 // Get all employees (Admin/HR only)
 router.get('/', isAdminOrHR, async (req, res) => {
   try {
-    const employees = await User.find({ role: 'employee' }).select('-password');
+    console.log('Fetching employees for user:', req.user?.role, req.user?.id);
+    const employees = await User.find({ 
+      $or: [
+        { role: 'employee' },
+        { role: 'hr' }
+      ]
+    }).select('-password').sort({ createdAt: -1 });
+    console.log('Found employees:', employees.length);
     res.json(employees);
   } catch (error) {
+    console.error('Error fetching employees:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -30,8 +38,8 @@ router.get('/:id', async (req, res) => {
     }
     
     // Employees can only view their own profile, unless admin/HR
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr' && 
-        req.session.userId !== req.params.id) {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && 
+        req.user?.id !== req.params.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -44,17 +52,24 @@ router.get('/:id', async (req, res) => {
 // Update employee
 router.put('/:id', async (req, res) => {
   try {
-    const { name, department, position } = req.body;
+    const { name, email, role, isActive } = req.body;
     
     // Check permissions
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr' && 
-        req.session.userId !== req.params.id) {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && 
+        req.user?.id !== req.params.id) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const updateData = { name, email, role, isActive };
+    
+    // Only admin can change role to admin
+    if (req.user?.role !== 'admin' && role === 'admin') {
+      return res.status(403).json({ message: 'Only admin can assign admin role' });
     }
 
     const employee = await User.findByIdAndUpdate(
       req.params.id,
-      { name, department, position },
+      updateData,
       { new: true, runValidators: true }
     ).select('-password');
 
@@ -71,8 +86,13 @@ router.put('/:id', async (req, res) => {
 // Delete employee (Admin only)
 router.delete('/:id', async (req, res) => {
   try {
-    if (req.session.userRole !== 'admin') {
+    if (req.user?.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin role required.' });
+    }
+
+    // Prevent self-deletion
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
     const employee = await User.findByIdAndDelete(req.params.id);
