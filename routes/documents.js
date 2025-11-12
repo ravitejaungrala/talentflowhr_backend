@@ -1,9 +1,10 @@
 const express = require('express');
 const Document = require('../models/Document');
+const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
 // Get documents
-router.get('/', async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     const documents = await Document.find()
       .populate('uploadedBy', 'name email department position');
@@ -14,15 +15,15 @@ router.get('/', async (req, res) => {
 });
 
 // Upload document
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr') {
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
       return res.status(403).json({ message: 'Access denied' });
     }
 
     const document = new Document({
       ...req.body,
-      uploadedBy: req.session.userId
+      uploadedBy: req.user.id
     });
     await document.save();
     await document.populate('uploadedBy', 'name email department position');
