@@ -1,29 +1,21 @@
 const express = require('express');
 const Skill = require('../models/Skill');
+const { authenticateJWT, requireAdminOrHR } = require('../middleware/auth');
 const router = express.Router();
 
-// Middleware to check if user is authenticated
-const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
-    next();
-  } else {
-    res.status(401).json({ message: 'Authentication required' });
-  }
-};
-
 // Get all skills (with permissions)
-router.get('/', isAuthenticated, async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     let skills;
-    console.log('Fetching skills for user:', req.session.userRole, req.session.userId);
+    console.log('Fetching skills for user:', req.user.role, req.user.id);
     
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       skills = await Skill.find()
         .populate('employee', 'name email department position')
         .populate('verifiedBy', 'name email')
         .sort({ createdAt: -1 });
     } else {
-      skills = await Skill.find({ employee: req.session.userId })
+      skills = await Skill.find({ employee: req.user.id })
         .populate('employee', 'name email department position')
         .populate('verifiedBy', 'name email')
         .sort({ createdAt: -1 });
@@ -38,14 +30,14 @@ router.get('/', isAuthenticated, async (req, res) => {
 });
 
 // Create skill
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { name, category, proficiency, yearsOfExperience } = req.body;
     
-    console.log('Creating skill for user:', req.session.userId);
+    console.log('Creating skill for user:', req.user.id);
     
     const skill = new Skill({
-      employee: req.session.userId,
+      employee: req.user.id,
       name,
       category,
       proficiency,
@@ -63,17 +55,17 @@ router.post('/', isAuthenticated, async (req, res) => {
 });
 
 // Update skill
-router.put('/:id', isAuthenticated, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
   try {
     const { name, category, proficiency, yearsOfExperience } = req.body;
     
     let skill;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       skill = await Skill.findById(req.params.id);
     } else {
       skill = await Skill.findOne({
         _id: req.params.id,
-        employee: req.session.userId
+        employee: req.user.id
       });
     }
 
@@ -97,17 +89,13 @@ router.put('/:id', isAuthenticated, async (req, res) => {
 });
 
 // Verify skill (Admin/HR only)
-router.patch('/:id/verify', isAuthenticated, async (req, res) => {
+router.patch('/:id/verify', authenticateJWT, requireAdminOrHR, async (req, res) => {
   try {
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr') {
-      return res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
-    }
-
     const skill = await Skill.findByIdAndUpdate(
       req.params.id,
       { 
         isVerified: true,
-        verifiedBy: req.session.userId
+        verifiedBy: req.user.id
       },
       { new: true, runValidators: true }
     ).populate('employee', 'name email department position')
@@ -125,15 +113,15 @@ router.patch('/:id/verify', isAuthenticated, async (req, res) => {
 });
 
 // Delete skill
-router.delete('/:id', isAuthenticated, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
     let skill;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       skill = await Skill.findById(req.params.id);
     } else {
       skill = await Skill.findOne({
         _id: req.params.id,
-        employee: req.session.userId
+        employee: req.user.id
       });
     }
 
