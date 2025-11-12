@@ -44,7 +44,11 @@ const feedbackRoutes = require('./routes/feedback');
 const leaveRoutes = require('./routes/leaves');
 const skillRoutes = require('./routes/skills');
 const announcementRoutes = require('./routes/announcements');
-
+const documentRoutes = require('./routes/documents');
+const goalRoutes = require('./routes/goals');
+const recognitionRoutes = require('./routes/recognition');
+const surveyRoutes = require('./routes/surveys');
+const trainingRoutes = require('./routes/training');
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -52,7 +56,11 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/announcements', announcementRoutes);
-
+app.use('/api/documents', documentRoutes);
+app.use('/api/goals', goalRoutes);
+app.use('/api/recognition', recognitionRoutes);
+app.use('/api/surveys', surveyRoutes);
+app.use('/api/training', trainingRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
@@ -85,6 +93,11 @@ app.get('/', (req, res) => {
       '/api/leaves',
       '/api/skills',
       '/api/announcements',
+      '/api/documents',
+      '/api/goals',
+      '/api/recognition',
+      '/api/surveys',
+      '/api/training',
       '/health',
       '/api/test'
     ]
