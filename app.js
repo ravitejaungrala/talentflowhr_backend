@@ -9,7 +9,7 @@ const app = express();
 // Enhanced CORS configuration
 app.use(cors({
   origin: [
-    'http://localhost:3001',
+    'http://localhost:3000',
     'http://localhost:5173',
     'https://talenthr-front.onrender.com/',
     'https://talenthr-front.onrender.com'
