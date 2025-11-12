@@ -1,53 +1,47 @@
 const express = require('express');
 const Feedback = require('../models/Feedback');
-const User = require('../models/User');
-const { authenticateJWT, requireAdminOrHR } = require('../middleware/auth');
+const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
-// Get all feedback (with permissions)
+// Get all feedback (admin/hr see all, employees see only their feedback)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    let feedback;
+    let feedbacks;
+    
     if (req.user.role === 'admin' || req.user.role === 'hr') {
-      feedback = await Feedback.find({ status: 'active' })
-        .populate('fromEmployee', 'name email department')
-        .populate('toEmployee', 'name email department')
+      // Admin/HR can see all feedback
+      feedbacks = await Feedback.find()
+        .populate('fromEmployee', 'name email department position')
+        .populate('toEmployee', 'name email department position')
         .sort({ createdAt: -1 });
     } else {
-      feedback = await Feedback.find({
-        status: 'active',
+      // Employees can only see feedback they sent or received
+      feedbacks = await Feedback.find({
         $or: [
           { fromEmployee: req.user.id },
           { toEmployee: req.user.id }
         ]
       })
-      .populate('fromEmployee', 'name email department')
-      .populate('toEmployee', 'name email department')
-      .sort({ createdAt: -1 });
+        .populate('fromEmployee', 'name email department position')
+        .populate('toEmployee', 'name email department position')
+        .sort({ createdAt: -1 });
     }
     
-    res.json(feedback);
+    res.json(feedbacks);
   } catch (error) {
+    console.error('Error fetching feedbacks:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// Create feedback
+// Create new feedback
 router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { toEmployee, message, category, isAnonymous } = req.body;
 
-    if (!toEmployee || !message) {
-      return res.status(400).json({ message: 'To employee and message are required' });
-    }
-
-    const toUser = await User.findById(toEmployee);
-    if (!toUser) {
-      return res.status(404).json({ message: 'Recipient employee not found' });
-    }
-
-    if (toEmployee === req.user.id.toString()) {
-      return res.status(400).json({ message: 'Cannot give feedback to yourself' });
+    // Employees cannot send feedback to themselves
+    if (toEmployee === req.user.id) {
+      return res.status(400).json({ message: 'Cannot send feedback to yourself' });
     }
 
     const feedback = new Feedback({
@@ -59,11 +53,14 @@ router.post('/', authenticateJWT, async (req, res) => {
     });
 
     await feedback.save();
-    await feedback.populate('fromEmployee', 'name email department');
-    await feedback.populate('toEmployee', 'name email department');
-
+    
+    // Populate the saved feedback
+    await feedback.populate('fromEmployee', 'name email department position');
+    await feedback.populate('toEmployee', 'name email department position');
+    
     res.status(201).json(feedback);
   } catch (error) {
+    console.error('Error creating feedback:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -73,30 +70,30 @@ router.put('/:id', authenticateJWT, async (req, res) => {
   try {
     const { message, category, isAnonymous } = req.body;
     
-    let feedback;
-    if (req.user.role === 'admin' || req.user.role === 'hr') {
-      feedback = await Feedback.findById(req.params.id);
-    } else {
-      feedback = await Feedback.findOne({
-        _id: req.params.id,
-        fromEmployee: req.user.id
-      });
-    }
-
+    const feedback = await Feedback.findById(req.params.id);
+    
     if (!feedback) {
-      return res.status(404).json({ message: 'Feedback not found or access denied' });
+      return res.status(404).json({ message: 'Feedback not found' });
     }
 
-    feedback.message = message;
-    feedback.category = category;
-    feedback.isAnonymous = isAnonymous;
+    // Only the sender or admin/hr can edit feedback
+    if (feedback.fromEmployee.toString() !== req.user.id && 
+        req.user.role !== 'admin' && 
+        req.user.role !== 'hr') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    feedback.message = message || feedback.message;
+    feedback.category = category || feedback.category;
+    feedback.isAnonymous = isAnonymous !== undefined ? isAnonymous : feedback.isAnonymous;
+
     await feedback.save();
-
-    await feedback.populate('fromEmployee', 'name email department');
-    await feedback.populate('toEmployee', 'name email department');
-
+    await feedback.populate('fromEmployee', 'name email department position');
+    await feedback.populate('toEmployee', 'name email department position');
+    
     res.json(feedback);
   } catch (error) {
+    console.error('Error updating feedback:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -104,25 +101,23 @@ router.put('/:id', authenticateJWT, async (req, res) => {
 // Delete feedback
 router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
-    let feedback;
-    if (req.user.role === 'admin' || req.user.role === 'hr') {
-      feedback = await Feedback.findById(req.params.id);
-    } else {
-      feedback = await Feedback.findOne({
-        _id: req.params.id,
-        fromEmployee: req.user.id
-      });
-    }
-
+    const feedback = await Feedback.findById(req.params.id);
+    
     if (!feedback) {
-      return res.status(404).json({ message: 'Feedback not found or access denied' });
+      return res.status(404).json({ message: 'Feedback not found' });
     }
 
-    feedback.status = 'archived';
-    await feedback.save();
+    // Only the sender or admin/hr can delete feedback
+    if (feedback.fromEmployee.toString() !== req.user.id && 
+        req.user.role !== 'admin' && 
+        req.user.role !== 'hr') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
 
+    await Feedback.findByIdAndDelete(req.params.id);
     res.json({ message: 'Feedback deleted successfully' });
   } catch (error) {
+    console.error('Error deleting feedback:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
