@@ -1,38 +1,92 @@
-const jwt = require('jsonwebtoken');
+const express = require('express');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'talentflow-jwt-secret-2024';
 
-// JWT Authentication Middleware
-const authenticateJWT = async (req, res, next) => {
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Register
+router.post('/register', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const { name, email, password, role, department, position } = req.body;
     
-    if (!token) {
-      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
-    
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid token.' });
-    }
+    const user = new User({
+      name,
+      email,
+      password,
+      role: role || 'employee',
+      department,
+      position
+    });
 
-    req.user = user;
-    next();
+    await user.save();
+    
+    const token = generateToken(user._id);
+    
+    res.status(201).json({
+      message: 'User created successfully',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        position: user.position
+      }
+    });
   } catch (error) {
-    res.status(401).json({ message: 'Invalid token.' });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
-};
+});
 
-// Admin/HR Check Middleware
-const requireAdminOrHR = (req, res, next) => {
-  if (req.user.role === 'admin' || req.user.role === 'hr') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
+// Login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user || !(await user.correctPassword(password, user.password))) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = generateToken(user._id);
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        position: user.position
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
-};
+});
 
-module.exports = { authenticateJWT, requireAdminOrHR };
+// Get current user
+const { authenticateJWT } = require('../middleware/auth');
+router.get('/me', authenticateJWT, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+module.exports = router;
