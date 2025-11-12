@@ -1,29 +1,21 @@
 const express = require('express');
 const Leave = require('../models/Leave');
+const { authenticateJWT, requireAdminOrHR } = require('../middleware/auth');
 const router = express.Router();
 
-// Middleware to check if user is authenticated
-const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
-    next();
-  } else {
-    res.status(401).json({ message: 'Authentication required' });
-  }
-};
-
 // Get all leaves (with permissions)
-router.get('/', isAuthenticated, async (req, res) => {
+router.get('/', authenticateJWT, async (req, res) => {
   try {
     let leaves;
-    console.log('Fetching leaves for user:', req.session.userRole, req.session.userId);
+    console.log('Fetching leaves for user:', req.user.role, req.user.id);
     
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       leaves = await Leave.find()
         .populate('employee', 'name email department position')
         .populate('approvedBy', 'name email')
         .sort({ createdAt: -1 });
     } else {
-      leaves = await Leave.find({ employee: req.session.userId })
+      leaves = await Leave.find({ employee: req.user.id })
         .populate('employee', 'name email department position')
         .populate('approvedBy', 'name email')
         .sort({ createdAt: -1 });
@@ -38,14 +30,14 @@ router.get('/', isAuthenticated, async (req, res) => {
 });
 
 // Create leave request
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/', authenticateJWT, async (req, res) => {
   try {
     const { leaveType, startDate, endDate, reason } = req.body;
     
-    console.log('Creating leave for user:', req.session.userId);
+    console.log('Creating leave for user:', req.user.id);
     
     const leave = new Leave({
-      employee: req.session.userId,
+      employee: req.user.id,
       leaveType,
       startDate,
       endDate,
@@ -63,17 +55,17 @@ router.post('/', isAuthenticated, async (req, res) => {
 });
 
 // Update leave request
-router.put('/:id', isAuthenticated, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
   try {
     const { leaveType, startDate, endDate, reason } = req.body;
     
     let leave;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       leave = await Leave.findById(req.params.id);
     } else {
       leave = await Leave.findOne({
         _id: req.params.id,
-        employee: req.session.userId
+        employee: req.user.id
       });
     }
 
@@ -97,19 +89,15 @@ router.put('/:id', isAuthenticated, async (req, res) => {
 });
 
 // Approve/Reject leave (Admin/HR only)
-router.patch('/:id/status', isAuthenticated, async (req, res) => {
+router.patch('/:id/status', authenticateJWT, requireAdminOrHR, async (req, res) => {
   try {
-    if (req.session.userRole !== 'admin' && req.session.userRole !== 'hr') {
-      return res.status(403).json({ message: 'Access denied. Admin or HR role required.' });
-    }
-
     const { status, notes } = req.body;
     
     const leave = await Leave.findByIdAndUpdate(
       req.params.id,
       { 
         status,
-        approvedBy: req.session.userId,
+        approvedBy: req.user.id,
         notes
       },
       { new: true, runValidators: true }
@@ -128,15 +116,15 @@ router.patch('/:id/status', isAuthenticated, async (req, res) => {
 });
 
 // Delete leave request
-router.delete('/:id', isAuthenticated, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
     let leave;
-    if (req.session.userRole === 'admin' || req.session.userRole === 'hr') {
+    if (req.user.role === 'admin' || req.user.role === 'hr') {
       leave = await Leave.findById(req.params.id);
     } else {
       leave = await Leave.findOne({
         _id: req.params.id,
-        employee: req.session.userId
+        employee: req.user.id
       });
     }
 
